@@ -3,6 +3,7 @@ import torch
 import subprocess
 from pprint import pprint
 
+from .zenodo import Zenodo
 
 PLEASE_PUBLISH = (
     "\nDon't forget to share your pretrained models at "
@@ -14,7 +15,7 @@ PLEASE_PUBLISH = (
 HREF = '<a href="{}">{}</a>'
 CC_SA = "Attribution-ShareAlike 3.0 Unported"
 CC_SA_LINK = "https://creativecommons.org/licenses/by-sa/3.0/"
-ASTEROID_REF = HREF.format("https://github.com/asteroid-team/asteroid", "Asteroid")
+ASTEROID_REF = HREF.format("https://github.com/mpariente/asteroid", "Asteroid")
 
 
 def save_publishable(publish_dir, model_dict, metrics=None, train_conf=None, recipe=None):
@@ -247,8 +248,7 @@ def zenodo_upload(model, token, model_path=None, use_sandbox=False):
         model_path_was_none = True
         model_path = "tmp.pth"
         torch.save(model, model_path)
-
-    from .zenodo import Zenodo
+        # raise ValueError("Need path")
 
     zen = Zenodo(token, use_sandbox=use_sandbox)
     metadata = make_metadata_from_model(model)
@@ -265,7 +265,6 @@ def zenodo_upload(model, token, model_path=None, use_sandbox=False):
 
 def make_metadata_from_model(model):
     """Create Zenodo deposit metadata for a given publishable model.
-
     Args:
         model (dict): Dictionary with all infos needed to publish.
             More info to come.
@@ -273,7 +272,7 @@ def make_metadata_from_model(model):
     Returns:
         dict, the metadata to create the Zenodo deposit with.
 
-    .. note:: We remove the PESQ from the final results as a license is needed to
+    .. note::We remove the PESQ from the final results as a license is needed to
         use it.
     """
     infos = model["infos"]
@@ -327,7 +326,6 @@ def make_metadata_from_model(model):
 
 def two_level_dict_html(dic):
     """Two-level dict to HTML.
-
     Args:
         dic (dict): two-level dict
 
@@ -349,7 +347,6 @@ def two_level_dict_html(dic):
 
 def display_one_level_dict(dic):
     """Single level dict to HTML
-
     Args:
         dic (dict):
 

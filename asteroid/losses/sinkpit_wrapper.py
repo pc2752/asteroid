@@ -1,5 +1,6 @@
 import torch
 from torch import nn
+import pytorch_lightning as pl
 
 from . import PITLossWrapper
 
@@ -14,15 +15,18 @@ class SinkPITLossWrapper(nn.Module):
         hungarian_validation (boolean) : Whether to use the Hungarian algorithm
             for the validation. (default = True)
 
-    ``loss_func`` computes pairwise losses and returns a torch.Tensor of shape
-    :math:`(batch, n\_src, n\_src)`. Each element :math:`(batch, i, j)` corresponds to
-    the loss between :math:`targets[:, i]` and :math:`est\_targets[:, j]`
-    It evaluates an approximate value of the PIT loss using Sinkhorn's iterative algorithm.
-    See :meth:`~PITLossWrapper.best_softperm_sinkhorn` and http://arxiv.org/abs/2010.11871
+        `loss_func` computes pairwise
+        losses and returns a torch.Tensor of shape
+        :math:`(batch, n\_src, n\_src)`. Each element
+        :math:`[batch, i, j]` corresponds to the loss between
+        :math:`targets[:, i]` and :math:`est\_targets[:, j]`
+        It evaluates an approximate value of the PIT loss
+        using Sinkhorn's iterative algorithm.
+        See :meth:`~PITLossWrapper.best_softperm_sinkhorn`
+        and http://arxiv.org/abs/2010.11871
 
     Examples
         >>> import torch
-        >>> import pytorch_lightning as pl
         >>> from asteroid.losses import pairwise_neg_sisdr
         >>> sources = torch.randn(10, 3, 16000)
         >>> est_sources = torch.randn(10, 3, 16000)
@@ -70,11 +74,10 @@ class SinkPITLossWrapper(nn.Module):
 
     def forward(self, est_targets, targets, return_est=False, **kwargs):
         """Evaluate the loss using Sinkhorn's algorithm.
-
         Args:
-            est_targets: torch.Tensor. Expected shape :math:`(batch, nsrc, ...)`.
+            est_targets: torch.Tensor. Expected shape [batch, nsrc, *].
                 The batch of target estimates.
-            targets: torch.Tensor. Expected shape :math:`(batch, nsrc, ...)`.
+            targets: torch.Tensor. Expected shape [batch, nsrc, *].
                 The batch of training targets
             return_est: Boolean. Whether to return the reordered targets
                 estimates (To compute metrics or to save example).
@@ -85,7 +88,7 @@ class SinkPITLossWrapper(nn.Module):
             - Best permutation loss for each batch sample, average over
                 the batch. torch.Tensor(loss_value)
             - The reordered targets estimates if return_est is True.
-                torch.Tensor of shape :math:`(batch, nsrc, ...)`.
+                torch.Tensor of shape [batch, nsrc, *].
         """
         n_src = targets.shape[1]
         assert n_src < 100, f"Expected source axis along dim 1, found {n_src}"
@@ -120,21 +123,18 @@ class SinkPITLossWrapper(nn.Module):
 
     @staticmethod
     def best_softperm_sinkhorn(pair_wise_losses, beta=10, n_iter=200):
-        r"""Compute an approximate PIT loss using Sinkhorn's algorithm.
+        """Compute an approximate PIT loss using Sinkhorn's algorithm.
         See http://arxiv.org/abs/2010.11871
-
         Args:
             pair_wise_losses (:class:`torch.Tensor`):
-                Tensor of shape :math:`(batch, n_src, n_src)`. Pairwise losses.
+                Tensor of shape [batch, n_src, n_src]. Pairwise losses.
             beta (float) : Inverse temperature parameter. (default = 10)
             n_iter (int) : Number of iteration. Even number. (default = 200)
-
         Returns:
-            - :class:`torch.Tensor`:
-              The loss corresponding to the best permutation of size (batch,).
-
-            - :class:`torch.Tensor`:
-              A soft permutation matrix.
+            tuple:
+                :class:`torch.Tensor`: The loss corresponding to the best
+                permutation of size (batch,).
+                :class:`torch.Tensor`: A soft permutation matrix.
         """
         C = pair_wise_losses.transpose(-1, -2)
         n_src = C.shape[-1]
@@ -146,3 +146,42 @@ class SinkPITLossWrapper(nn.Module):
         min_loss = torch.einsum("bij,bij->b", C + Z / beta, torch.exp(Z))
         min_loss = min_loss / n_src
         return min_loss, torch.exp(Z)
+
+
+def sinkpit_default_beta_schedule(epoch):
+    return min([1.02 ** epoch, 10])
+
+
+class SinkPITBetaScheduler(pl.callbacks.Callback):
+    r"""Scheduler of the beta value of SinkPITLossWrapper
+    This module is used as a Callback function of `pytorch_lightning.Trainer`.
+
+    Args:
+        cooling_schedule (callable) : A callable
+            that takes a parameter `epoch` (int)
+            and returns the value of `beta` (float).
+
+            The default function is `sinkpit_default_beta_schedule`.
+            :math: \beta = min(1.02^{epoch}, 10)
+
+    Example
+        >>> from pytorch_lightning import Trainer
+        >>> from asteroid.losses import SinkPITBetaScheduler
+        >>> # Default scheduling function
+        >>> sinkpit_beta_schedule = SinkPITBetaSchedule()
+        >>> trainer = Trainer(callbacks=[sinkpit_beta_schedule])
+        >>> # User-defined schedule
+        >>> sinkpit_beta_schedule = SinkPITBetaScheduler(lambda ep: 1. if ep < 10 else 100.)
+        >>> trainer = Trainer(callbacks=[sinkpit_beta_schedule])
+    """
+
+    def __init__(self, cooling_schedule=sinkpit_default_beta_schedule):
+        self.cooling_schedule = cooling_schedule
+
+    def on_epoch_start(self, trainer, pl_module):
+        assert isinstance(pl_module.loss_func, SinkPITLossWrapper)
+        assert trainer.current_epoch == pl_module.current_epoch  # same
+        epoch = pl_module.current_epoch
+        # step = pl_module.global_step
+        beta = self.cooling_schedule(epoch)
+        pl_module.loss_func.beta = beta

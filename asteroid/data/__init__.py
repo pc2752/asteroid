@@ -1,4 +1,3 @@
-from .avspeech_dataset import AVSpeechDataset
 from .wham_dataset import WhamDataset
 from .whamr_dataset import WhamRDataset
 from .dns_dataset import DNSDataset
@@ -11,7 +10,6 @@ from .fuss_dataset import FUSSDataset
 from .dampvsep_dataset import DAMPVSEPSinglesDataset
 
 __all__ = [
-    "AVSpeechDataset",
     "WhamDataset",
     "WhamRDataset",
     "DNSDataset",

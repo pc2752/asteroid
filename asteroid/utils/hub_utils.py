@@ -18,7 +18,6 @@ MODELS_URLS_HASHTABLE = {
     "popcornell/DeMask_Surgical_mask_speech_enhancement_v1": "https://zenodo.org/record/3997047/files/model.pth?download=1",
     "popcornell/DPRNNTasNet_WHAM_enhancesingle": "https://zenodo.org/record/3998647/files/model.pth?download=1",
     "tmirzaev-dotcom/ConvTasNet_Libri3Mix_sepnoisy": "https://zenodo.org/record/4020529/files/model.pth?download=1",
-    "mhu-coder/ConvTasNet_Libri1Mix_enhsingle": "https://zenodo.org/record/4301955/files/model.pth?download=1",
 }
 
 SR_HASHTABLE = {k: 8000.0 if not "DeMask" in k else 16000.0 for k in MODELS_URLS_HASHTABLE}
@@ -29,9 +28,9 @@ def cached_download(filename_or_url):
 
     Args:
         filename_or_url (str): Name of a model as named on the Zenodo Community
-            page (ex: ``"mpariente/ConvTasNet_WHAM!_sepclean"``), or an URL to a model
-            file (ex: ``"https://zenodo.org/.../model.pth"``), or a filename
-            that exists locally (ex: ``"local/tmp_model.pth"``)
+            page (ex: mpariente/ConvTasNet_WHAM!_sepclean), or an URL to a model
+            file (ex: https://zenodo.org/.../model.pth), or a filename
+            that exists locally (ex: local/tmp_model.pth)
 
     Returns:
         str, normalized path to the downloaded (or not) model
@@ -58,7 +57,7 @@ def cached_download(filename_or_url):
 
 
 def url_to_filename(url):
-    """Consistently convert ``url`` into a filename."""
+    """ Consistently convert `url` into a filename. """
     _bytes = url.encode("utf-8")
     _hash = sha256(_bytes)
     filename = _hash.hexdigest()
